@@ -203,11 +203,98 @@ def lang_kb():
 
 # ─── Хэндлеры ─────────────────────────────────────────────────────────────────
 
+def save_user(user_id: int):
+    """Сохраняем user_id в users.txt для /broadcast."""
+    try:
+        try:
+            with open("users.txt") as f:
+                existing = set(line.strip() for line in f if line.strip())
+        except FileNotFoundError:
+            existing = set()
+        if str(user_id) not in existing:
+            with open("users.txt", "a") as f:
+                f.write(f"{user_id}\n")
+    except Exception as e:
+        log.error("save_user error: %s", e)
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     ctx.user_data["awaiting"] = None
+    save_user(user.id)
     await update.message.reply_text(
         s(user, ctx, "welcome"),
+        parse_mode="Markdown",
+        reply_markup=main_kb(user, ctx),
+    )
+
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    help_text = {
+        "ru": "🚗 *GarageLog Feedback Bot*\n\n"
+              "Используй кнопки чтобы:\n"
+              "🐛 сообщить об ошибке\n"
+              "💡 предложить идею\n"
+              "💬 оставить общий отзыв\n\n"
+              "Команды:\n"
+              "/start — главное меню\n"
+              "/language — сменить язык\n"
+              "/cancel — отменить ввод\n"
+              "/help — эта справка",
+        "en": "🚗 *GarageLog Feedback Bot*\n\n"
+              "Use the buttons to:\n"
+              "🐛 report a bug\n"
+              "💡 suggest an idea\n"
+              "💬 leave general feedback\n\n"
+              "Commands:\n"
+              "/start — main menu\n"
+              "/language — change language\n"
+              "/cancel — cancel input\n"
+              "/help — this help",
+        "zh": "🚗 *GarageLog 反馈机器人*\n\n"
+              "使用按钮：\n"
+              "🐛 报告错误\n"
+              "💡 提出建议\n"
+              "💬 综合反馈\n\n"
+              "命令：\n"
+              "/start — 主菜单\n"
+              "/language — 更改语言\n"
+              "/cancel — 取消\n"
+              "/help — 帮助",
+        "es": "🚗 *GarageLog Feedback Bot*\n\n"
+              "Usa los botones para:\n"
+              "🐛 reportar un error\n"
+              "💡 sugerir una idea\n"
+              "💬 dejar feedback\n\n"
+              "Comandos:\n"
+              "/start — menú principal\n"
+              "/language — cambiar idioma\n"
+              "/cancel — cancelar\n"
+              "/help — esta ayuda",
+        "de": "🚗 *GarageLog Feedback Bot*\n\n"
+              "Nutze die Buttons um:\n"
+              "🐛 einen Fehler zu melden\n"
+              "💡 eine Idee vorzuschlagen\n"
+              "💬 allgemeines Feedback zu geben\n\n"
+              "Befehle:\n"
+              "/start — Hauptmenü\n"
+              "/language — Sprache ändern\n"
+              "/cancel — Abbrechen\n"
+              "/help — diese Hilfe",
+        "fr": "🚗 *GarageLog Feedback Bot*\n\n"
+              "Utilisez les boutons pour :\n"
+              "🐛 signaler un bug\n"
+              "💡 proposer une idée\n"
+              "💬 laisser un retour\n\n"
+              "Commandes :\n"
+              "/start — menu principal\n"
+              "/language — changer de langue\n"
+              "/cancel — annuler\n"
+              "/help — cette aide",
+    }
+    lang = get_lang(user, ctx)
+    await update.message.reply_text(
+        help_text.get(lang, help_text["en"]),
         parse_mode="Markdown",
         reply_markup=main_kb(user, ctx),
     )
@@ -365,6 +452,7 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start",     cmd_start))
+    app.add_handler(CommandHandler("help",      cmd_help))
     app.add_handler(CommandHandler("cancel",    cmd_cancel))
     app.add_handler(CommandHandler("language",  cmd_language))
     app.add_handler(CommandHandler("broadcast", cmd_broadcast))
