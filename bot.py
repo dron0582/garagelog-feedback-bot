@@ -461,19 +461,10 @@ def main():
 
     log.info("🚗 GarageLog Bot запущен")
 
-    async def run():
-        await app.initialize()
-        await app.start()
-        await app.updater.start_polling(
-            drop_pending_updates=True,
-            allowed_updates=["message", "edited_message", "callback_query", "channel_post"],
-        )
-        await asyncio.Event().wait()
-
-    try:
-        asyncio.run(run())
-    except KeyboardInterrupt:
-        log.info("Остановлен")
+    app.run_polling(
+        drop_pending_updates=True,
+        allowed_updates=["message", "edited_message", "callback_query", "channel_post"],
+    )
 
 if __name__ == "__main__":
     main()
