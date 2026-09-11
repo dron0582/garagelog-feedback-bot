@@ -1,21 +1,20 @@
 """
-GarageLog Feedback Bot — multilingual, без ConversationHandler
+GarageLog Feedback Bot — webhook mode
 """
 
 import os
 import logging
-import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-ADMIN_ID  = int(os.getenv("ADMIN_ID", "0"))
+BOT_TOKEN    = os.getenv("BOT_TOKEN", "")
+ADMIN_ID     = int(os.getenv("ADMIN_ID", "0"))
+WEBHOOK_URL  = os.getenv("WEBHOOK_URL", "")   # https://yourapp.railway.app
+PORT         = int(os.getenv("PORT", "8443"))
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
-
-# ─── Переводы ─────────────────────────────────────────────────────────────────
 
 STRINGS = {
     "ru": {
@@ -37,7 +36,6 @@ STRINGS = {
         "label_bug":       "🐛 Ошибка",
         "label_idea":      "💡 Идея",
         "label_feedback":  "💬 Отзыв",
-        "reply_from":      "📨 *Ответ от разработчика GarageLog:*\n\n",
     },
     "en": {
         "welcome":         "👋 Hi! This is the *GarageLog* feedback bot.\n\nWhat would you like to do?",
@@ -58,7 +56,6 @@ STRINGS = {
         "label_bug":       "🐛 Bug",
         "label_idea":      "💡 Idea",
         "label_feedback":  "💬 Feedback",
-        "reply_from":      "📨 *Reply from the GarageLog developer:*\n\n",
     },
     "zh": {
         "welcome":         "👋 你好！这是 *GarageLog* 反馈机器人。\n\n请选择：",
@@ -68,7 +65,7 @@ STRINGS = {
         "btn_language":    "🌐 语言",
         "choose_lang":     "🌐 选择语言：",
         "lang_set":        "✅ 语言：中文\n\n",
-        "prompt_bug":      "🐛 请描述错误：\n• 你做了什么\n• 期望什么\n• 发生了什么\n• 设备 / 浏览器\n\n或 /cancel 取消。",
+        "prompt_bug":      "🐛 请描述错误\n\n或 /cancel 取消。",
         "prompt_idea":     "💡 请告诉我们你的想法\n\n或 /cancel 取消。",
         "prompt_feedback": "💬 请分享你的反馈\n\n或 /cancel 取消。",
         "thanks_bug":      "✅ 谢谢！我们会调查。",
@@ -79,7 +76,6 @@ STRINGS = {
         "label_bug":       "🐛 错误",
         "label_idea":      "💡 建议",
         "label_feedback":  "💬 反馈",
-        "reply_from":      "📨 *GarageLog 开发者回复：*\n\n",
     },
     "es": {
         "welcome":         "👋 ¡Hola! Este es el bot de feedback de *GarageLog*.\n\n¿Qué quieres hacer?",
@@ -89,7 +85,7 @@ STRINGS = {
         "btn_language":    "🌐 Idioma",
         "choose_lang":     "🌐 Elige tu idioma:",
         "lang_set":        "✅ Idioma: Español\n\n",
-        "prompt_bug":      "🐛 Describe el error:\n• qué hiciste\n• qué esperabas\n• qué pasó\n• dispositivo / navegador\n\nO /cancel para cancelar.",
+        "prompt_bug":      "🐛 Describe el error\n\nO /cancel para cancelar.",
         "prompt_idea":     "💡 Cuéntanos tu idea\n\nO /cancel para cancelar.",
         "prompt_feedback": "💬 Comparte tu opinión\n\nO /cancel para cancelar.",
         "thanks_bug":      "✅ ¡Gracias! Investigaremos.",
@@ -100,7 +96,6 @@ STRINGS = {
         "label_bug":       "🐛 Error",
         "label_idea":      "💡 Idea",
         "label_feedback":  "💬 Feedback",
-        "reply_from":      "📨 *Respuesta del desarrollador:*\n\n",
     },
     "de": {
         "welcome":         "👋 Hallo! Dies ist der Feedback-Bot von *GarageLog*.\n\nWas möchtest du tun?",
@@ -110,7 +105,7 @@ STRINGS = {
         "btn_language":    "🌐 Sprache",
         "choose_lang":     "🌐 Wähle deine Sprache:",
         "lang_set":        "✅ Sprache: Deutsch\n\n",
-        "prompt_bug":      "🐛 Beschreibe den Fehler:\n• was du gemacht hast\n• was du erwartet hast\n• was passiert ist\n• Gerät / Browser\n\nOder /cancel zum Abbrechen.",
+        "prompt_bug":      "🐛 Beschreibe den Fehler\n\nOder /cancel zum Abbrechen.",
         "prompt_idea":     "💡 Erzähl uns deine Idee\n\nOder /cancel zum Abbrechen.",
         "prompt_feedback": "💬 Teile dein Feedback\n\nOder /cancel zum Abbrechen.",
         "thanks_bug":      "✅ Danke! Wir untersuchen den Fehler.",
@@ -121,7 +116,6 @@ STRINGS = {
         "label_bug":       "🐛 Fehler",
         "label_idea":      "💡 Idee",
         "label_feedback":  "💬 Feedback",
-        "reply_from":      "📨 *Antwort vom Entwickler:*\n\n",
     },
     "fr": {
         "welcome":         "👋 Bonjour ! Ceci est le bot de retour de *GarageLog*.\n\nQue souhaitez-vous faire ?",
@@ -131,7 +125,7 @@ STRINGS = {
         "btn_language":    "🌐 Langue",
         "choose_lang":     "🌐 Choisissez votre langue :",
         "lang_set":        "✅ Langue : Français\n\n",
-        "prompt_bug":      "🐛 Décrivez le bug :\n• ce que vous avez fait\n• ce que vous attendiez\n• ce qui s'est passé\n• appareil / navigateur\n\nOu /cancel pour annuler.",
+        "prompt_bug":      "🐛 Décrivez le bug\n\nOu /cancel pour annuler.",
         "prompt_idea":     "💡 Partagez votre idée\n\nOu /cancel pour annuler.",
         "prompt_feedback": "💬 Partagez votre avis\n\nOu /cancel pour annuler.",
         "thanks_bug":      "✅ Merci ! Nous allons examiner.",
@@ -142,47 +136,29 @@ STRINGS = {
         "label_bug":       "🐛 Bug",
         "label_idea":      "💡 Idée",
         "label_feedback":  "💬 Retour",
-        "reply_from":      "📨 *Réponse du développeur :*\n\n",
     },
 }
 
-LANG_MAP = {
-    "ru": "ru", "be": "ru", "uk": "ru",
-    "en": "en",
-    "zh": "zh",
-    "es": "es",
-    "de": "de",
-    "fr": "fr",
-}
-
+LANG_MAP = {"ru": "ru", "be": "ru", "uk": "ru", "en": "en", "zh": "zh", "es": "es", "de": "de", "fr": "fr"}
 LANG_BUTTONS = [
-    ("🇷🇺 Русский", "lang:ru"),
-    ("🇬🇧 English",  "lang:en"),
-    ("🇨🇳 中文",      "lang:zh"),
-    ("🇪🇸 Español",  "lang:es"),
-    ("🇩🇪 Deutsch",  "lang:de"),
-    ("🇫🇷 Français", "lang:fr"),
+    ("🇷🇺 Русский", "lang:ru"), ("🇬🇧 English", "lang:en"),
+    ("🇨🇳 中文", "lang:zh"),    ("🇪🇸 Español", "lang:es"),
+    ("🇩🇪 Deutsch", "lang:de"), ("🇫🇷 Français", "lang:fr"),
 ]
 
-# Состояние ожидания текста: храним в user_data["awaiting"]
-# Значения: "bug" | "idea" | "feedback" | None
-
-def get_lang(user, ctx) -> str:
+def get_lang(user, ctx):
     if ctx.user_data.get("lang"):
         return ctx.user_data["lang"]
     code = (user.language_code or "en").lower().split("-")[0]
     return LANG_MAP.get(code, "en")
 
-def s(user, ctx, key) -> str:
+def s(user, ctx, key):
     return STRINGS.get(get_lang(user, ctx), STRINGS["en"])[key]
 
-def username_str(user) -> str:
-    name = user.full_name
-    if user.username:
-        name += f" (@{user.username})"
-    return name
+def username_str(user):
+    return user.full_name + (f" (@{user.username})" if user.username else "")
 
-def now() -> str:
+def now():
     return datetime.now().strftime("%d.%m.%Y %H:%M")
 
 def main_kb(user, ctx):
@@ -196,108 +172,26 @@ def main_kb(user, ctx):
 def lang_kb():
     rows = []
     for i in range(0, len(LANG_BUTTONS), 2):
-        rows.append([InlineKeyboardButton(label, callback_data=cb)
-                     for label, cb in LANG_BUTTONS[i:i+2]])
+        rows.append([InlineKeyboardButton(l, callback_data=c) for l, c in LANG_BUTTONS[i:i+2]])
     return InlineKeyboardMarkup(rows)
 
-
-# ─── Хэндлеры ─────────────────────────────────────────────────────────────────
-
-def save_user(user_id: int):
-    """Сохраняем user_id в users.txt для /broadcast."""
+def save_user(uid):
     try:
         try:
-            with open("users.txt") as f:
-                existing = set(line.strip() for line in f if line.strip())
+            existing = set(open("users.txt").read().splitlines())
         except FileNotFoundError:
             existing = set()
-        if str(user_id) not in existing:
+        if str(uid) not in existing:
             with open("users.txt", "a") as f:
-                f.write(f"{user_id}\n")
+                f.write(f"{uid}\n")
     except Exception as e:
-        log.error("save_user error: %s", e)
-
+        log.error("save_user: %s", e)
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     ctx.user_data["awaiting"] = None
     save_user(user.id)
-    await update.message.reply_text(
-        s(user, ctx, "welcome"),
-        parse_mode="Markdown",
-        reply_markup=main_kb(user, ctx),
-    )
-
-async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    help_text = {
-        "ru": "🚗 *GarageLog Feedback Bot*\n\n"
-              "Используй кнопки чтобы:\n"
-              "🐛 сообщить об ошибке\n"
-              "💡 предложить идею\n"
-              "💬 оставить общий отзыв\n\n"
-              "Команды:\n"
-              "/start — главное меню\n"
-              "/language — сменить язык\n"
-              "/cancel — отменить ввод\n"
-              "/help — эта справка",
-        "en": "🚗 *GarageLog Feedback Bot*\n\n"
-              "Use the buttons to:\n"
-              "🐛 report a bug\n"
-              "💡 suggest an idea\n"
-              "💬 leave general feedback\n\n"
-              "Commands:\n"
-              "/start — main menu\n"
-              "/language — change language\n"
-              "/cancel — cancel input\n"
-              "/help — this help",
-        "zh": "🚗 *GarageLog 反馈机器人*\n\n"
-              "使用按钮：\n"
-              "🐛 报告错误\n"
-              "💡 提出建议\n"
-              "💬 综合反馈\n\n"
-              "命令：\n"
-              "/start — 主菜单\n"
-              "/language — 更改语言\n"
-              "/cancel — 取消\n"
-              "/help — 帮助",
-        "es": "🚗 *GarageLog Feedback Bot*\n\n"
-              "Usa los botones para:\n"
-              "🐛 reportar un error\n"
-              "💡 sugerir una idea\n"
-              "💬 dejar feedback\n\n"
-              "Comandos:\n"
-              "/start — menú principal\n"
-              "/language — cambiar idioma\n"
-              "/cancel — cancelar\n"
-              "/help — esta ayuda",
-        "de": "🚗 *GarageLog Feedback Bot*\n\n"
-              "Nutze die Buttons um:\n"
-              "🐛 einen Fehler zu melden\n"
-              "💡 eine Idee vorzuschlagen\n"
-              "💬 allgemeines Feedback zu geben\n\n"
-              "Befehle:\n"
-              "/start — Hauptmenü\n"
-              "/language — Sprache ändern\n"
-              "/cancel — Abbrechen\n"
-              "/help — diese Hilfe",
-        "fr": "🚗 *GarageLog Feedback Bot*\n\n"
-              "Utilisez les boutons pour :\n"
-              "🐛 signaler un bug\n"
-              "💡 proposer une idée\n"
-              "💬 laisser un retour\n\n"
-              "Commandes :\n"
-              "/start — menu principal\n"
-              "/language — changer de langue\n"
-              "/cancel — annuler\n"
-              "/help — cette aide",
-    }
-    lang = get_lang(user, ctx)
-    await update.message.reply_text(
-        help_text.get(lang, help_text["en"]),
-        parse_mode="Markdown",
-        reply_markup=main_kb(user, ctx),
-    )
+    await update.message.reply_text(s(user, ctx, "welcome"), parse_mode="Markdown", reply_markup=main_kb(user, ctx))
 
 async def cmd_cancel(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -308,19 +202,29 @@ async def cmd_language(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(s(user, ctx, "choose_lang"), reply_markup=lang_kb())
 
+async def cmd_help(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    lang = get_lang(user, ctx)
+    texts = {
+        "ru": "🚗 *GarageLog Feedback Bot*\n\n🐛 Ошибка · 💡 Идея · 💬 Отзыв\n\n/start · /language · /cancel · /help",
+        "en": "🚗 *GarageLog Feedback Bot*\n\n🐛 Bug · 💡 Idea · 💬 Feedback\n\n/start · /language · /cancel · /help",
+        "zh": "🚗 *GarageLog 反馈机器人*\n\n🐛 错误 · 💡 建议 · 💬 反馈\n\n/start · /language · /cancel · /help",
+        "es": "🚗 *GarageLog Feedback Bot*\n\n🐛 Error · 💡 Idea · 💬 Feedback\n\n/start · /language · /cancel · /help",
+        "de": "🚗 *GarageLog Feedback Bot*\n\n🐛 Fehler · 💡 Idee · 💬 Feedback\n\n/start · /language · /cancel · /help",
+        "fr": "🚗 *GarageLog Feedback Bot*\n\n🐛 Bug · 💡 Idée · 💬 Retour\n\n/start · /language · /cancel · /help",
+    }
+    await update.message.reply_text(texts.get(lang, texts["en"]), parse_mode="Markdown", reply_markup=main_kb(user, ctx))
+
 async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     user = q.from_user
     data = q.data
-
     await q.answer()
 
-    # Выбор языка — открываем список
     if data == "show_langs":
         await q.edit_message_text(s(user, ctx, "choose_lang"), reply_markup=lang_kb())
         return
 
-    # Установка языка
     if data.startswith("lang:"):
         lang = data.split(":")[1]
         ctx.user_data["lang"] = lang
@@ -331,7 +235,6 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # Выбор типа обращения
     if data.startswith("action:"):
         kind = data.split(":")[1]
         ctx.user_data["awaiting"] = kind
@@ -339,84 +242,60 @@ async def on_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(s(user, ctx, prompt_key))
         return
 
-    # Ответ админа пользователю
     if data.startswith("reply:"):
         if user.id != ADMIN_ID:
             return
         _, user_id, user_name = data.split(":", 2)
-        ctx.user_data["reply_to_id"]   = int(user_id)
+        ctx.user_data["reply_to_id"] = int(user_id)
         ctx.user_data["reply_to_name"] = user_name
         await q.edit_message_reply_markup(None)
-        await ctx.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"✏️ Напиши ответ для *{user_name}* (или /cancel):",
-            parse_mode="Markdown",
-        )
+        await ctx.bot.send_message(chat_id=ADMIN_ID, text=f"✏️ Напиши ответ для *{user_name}* (или /cancel):", parse_mode="Markdown")
 
 async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = update.message.text
 
-    # Ответ админа
     if user.id == ADMIN_ID and ctx.user_data.get("reply_to_id"):
-        uid   = ctx.user_data.pop("reply_to_id")
+        uid = ctx.user_data.pop("reply_to_id")
         uname = ctx.user_data.pop("reply_to_name", "")
         try:
-            await ctx.bot.send_message(
-                chat_id=uid,
-                text=f"📨 *Reply from GarageLog developer:*\n\n{text}",
-                parse_mode="Markdown",
-            )
+            await ctx.bot.send_message(chat_id=uid, text=f"📨 *Reply from GarageLog developer:*\n\n{text}", parse_mode="Markdown")
             await update.message.reply_text(f"✅ Отправлено: {uname}")
         except Exception as e:
             await update.message.reply_text(f"❌ Ошибка: {e}")
         return
 
-    # Ожидаем фидбек от пользователя
     kind = ctx.user_data.get("awaiting")
     if not kind:
-        await update.message.reply_text(
-            s(user, ctx, "welcome"),
-            parse_mode="Markdown",
-            reply_markup=main_kb(user, ctx),
-        )
+        await update.message.reply_text(s(user, ctx, "welcome"), parse_mode="Markdown", reply_markup=main_kb(user, ctx))
         return
 
     ctx.user_data["awaiting"] = None
-
-    label_key = {"bug": "label_bug", "idea": "label_idea", "feedback": "label_feedback"}
-    label = s(user, ctx, label_key[kind])
-    lang  = get_lang(user, ctx)
+    label = s(user, ctx, {"bug": "label_bug", "idea": "label_idea", "feedback": "label_feedback"}[kind])
+    lang = get_lang(user, ctx)
 
     admin_msg = (
         f"{label} *— новое сообщение*\n"
         f"──────────────────\n"
         f"👤 {username_str(user)}\n"
         f"🆔 `{user.id}`\n"
-        f"🌐 `{lang}` (tg: `{user.language_code}`)\n"
+        f"🌐 `{lang}`\n"
         f"🕐 {now()}\n"
         f"──────────────────\n"
         f"{text}"
     )
-    reply_kb = InlineKeyboardMarkup([[
-        InlineKeyboardButton("↩️ Ответить", callback_data=f"reply:{user.id}:{user.full_name}")
-    ]])
-
     try:
         await ctx.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=admin_msg,
-            parse_mode="Markdown",
-            reply_markup=reply_kb,
+            chat_id=ADMIN_ID, text=admin_msg, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("↩️ Ответить", callback_data=f"reply:{user.id}:{user.full_name}")
+            ]])
         )
     except Exception as e:
         log.error("Forward error: %s", e)
 
-    thanks_key = {"bug": "thanks_bug", "idea": "thanks_idea", "feedback": "thanks_feedback"}
-    await update.message.reply_text(
-        s(user, ctx, thanks_key[kind]) + s(user, ctx, "more"),
-        reply_markup=main_kb(user, ctx),
-    )
+    thanks = {"bug": "thanks_bug", "idea": "thanks_idea", "feedback": "thanks_feedback"}[kind]
+    await update.message.reply_text(s(user, ctx, thanks) + s(user, ctx, "more"), reply_markup=main_kb(user, ctx))
 
 async def cmd_broadcast(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
@@ -426,8 +305,7 @@ async def cmd_broadcast(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     text = " ".join(ctx.args)
     try:
-        with open("users.txt") as f:
-            uids = [int(l.strip()) for l in f if l.strip()]
+        uids = [int(l.strip()) for l in open("users.txt") if l.strip()]
     except FileNotFoundError:
         await update.message.reply_text("users.txt не найден.")
         return
@@ -440,9 +318,6 @@ async def cmd_broadcast(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             failed += 1
     await update.message.reply_text(f"✅ {sent}, ❌ {failed}")
 
-
-# ─── Запуск ───────────────────────────────────────────────────────────────────
-
 def main():
     if not BOT_TOKEN:
         raise ValueError("Укажи BOT_TOKEN!")
@@ -450,7 +325,6 @@ def main():
         raise ValueError("Укажи ADMIN_ID!")
 
     app = Application.builder().token(BOT_TOKEN).build()
-
     app.add_handler(CommandHandler("start",     cmd_start))
     app.add_handler(CommandHandler("help",      cmd_help))
     app.add_handler(CommandHandler("cancel",    cmd_cancel))
@@ -459,12 +333,18 @@ def main():
     app.add_handler(CallbackQueryHandler(on_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
 
-    log.info("🚗 GarageLog Bot запущен")
+    log.info("🚗 GarageLog Bot запущен (webhook)")
 
-    app.run_polling(
-        drop_pending_updates=True,
-        allowed_updates=["message", "edited_message", "callback_query", "channel_post"],
-    )
+    if WEBHOOK_URL:
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            webhook_url=f"{WEBHOOK_URL}/webhook",
+            url_path="/webhook",
+        )
+    else:
+        log.warning("WEBHOOK_URL не задан — запускаю polling (только для локальной разработки)")
+        app.run_polling(drop_pending_updates=True, allowed_updates=["message","edited_message","callback_query","channel_post"])
 
 if __name__ == "__main__":
     main()
